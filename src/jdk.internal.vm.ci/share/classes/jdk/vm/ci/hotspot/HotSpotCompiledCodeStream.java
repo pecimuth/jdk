@@ -74,6 +74,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 
 import jdk.internal.misc.Unsafe;
@@ -543,10 +544,10 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
         this.runtime = HotSpotJVMCIRuntime.runtime();
         this.withTypeInfo = withTypeInfo;
 
-        ResolvedJavaMethod[] methods = withMethods ? code.methods : null;
-        Assumption[] assumptions = code.assumptions;
+        List<ResolvedJavaMethod> methods = withMethods ? code.methods : null;
+        List<Assumption> assumptions = code.assumptions;
         StackSlot deoptRescueSlot = code.deoptRescueSlot;
-        Comment[] comments = withComments ? code.comments : null;
+        List<Comment> comments = withComments ? code.comments : null;
 
         String name = code.name;
         codeDesc = name;
@@ -562,7 +563,7 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
 
         // @formatter:off
         int flags = setIf(IS_NMETHOD, nmethod != null) |
-                    setIf(HAS_METHODS, nmethod != null && methods != null && methods.length != 0 ) |
+                    setIf(HAS_METHODS, nmethod != null && methods != null && !methods.isEmpty() ) |
                     setIf(HAS_ASSUMPTIONS, assumptions) |
                     setIf(HAS_DEOPT_RESCUE_SLOT, deoptRescueSlot != null) |
                     setIf(HAS_COMMENTS, comments);
@@ -583,13 +584,13 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
             writeAssumptions(assumptions);
         }
         if (isSet(flags, HAS_METHODS)) {
-            writeU2("methods:length", methods.length);
+            writeU2("methods:length", methods.size());
             for (ResolvedJavaMethod method : methods) {
                 writeMethod("method", method);
             }
         }
 
-        writeInt("sites:length", code.sites.length);
+        writeInt("sites:length", code.sites.size());
         writeInt("targetCodeSize", code.targetCodeSize);
         writeInt("totalFrameSize", code.totalFrameSize);
         if (isSet(flags, HAS_DEOPT_RESCUE_SLOT)) {
@@ -605,7 +606,7 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
         writeSites(code);
 
         if (isSet(flags, HAS_COMMENTS)) {
-            writeU2("comments:length", comments.length);
+            writeU2("comments:length", comments.size());
             for (Comment c : comments) {
                 writeInt("comment:pcOffset", c.pcOffset);
                 writeUTF8("comment:text", c.text);
@@ -735,8 +736,7 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
     }
 
     private void writeSites(HotSpotCompiledCode code) {
-        Site[] sites = code.sites;
-        for (Site site : sites) {
+        for (Site site : code.sites) {
             writeInt("site:pcOffset", site.pcOffset);
             if (site instanceof Call) {
                 Call call = (Call) site;
@@ -804,8 +804,8 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
         }
     }
 
-    private void writeDataSectionPatches(DataPatch[] dataSectionPatches) {
-        writeU2("dataSectionPatches:length", dataSectionPatches.length);
+    private void writeDataSectionPatches(List<DataPatch> dataSectionPatches) {
+        writeU2("dataSectionPatches:length", dataSectionPatches.size());
         for (DataPatch dp : dataSectionPatches) {
             Reference ref = dp.reference;
             if (!(ref instanceof ConstantReference)) {
@@ -927,8 +927,8 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
         writeU2("numTrampolineStubs", numTrampolineStubs);
     }
 
-    private void writeAssumptions(Assumption[] assumptions) {
-        writeU2("assumptions:length", assumptions.length);
+    private void writeAssumptions(List<Assumption> assumptions) {
+        writeU2("assumptions:length", assumptions.size());
         for (Assumption a : assumptions) {
             if (a instanceof NoFinalizableSubclass) {
                 writeTag(NO_FINALIZABLE_SUBCLASS);
@@ -1177,8 +1177,8 @@ final class HotSpotCompiledCodeStream implements AutoCloseable {
     /**
      * Returns {@code flag} if {@code condition == true} else {@code 0}.
      */
-    private static int setIf(int flag, Object[] array) {
-        return array != null && array.length > 0 ? flag : 0;
+    private static int setIf(int flag, List<?> array) {
+        return array != null && !array.isEmpty() ? flag : 0;
     }
 
     /**
